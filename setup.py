@@ -12,6 +12,8 @@ setup(
     python_requires='>=2.7',
     packages=['ci_core_dumper'],
     install_requires = [],
-    entry_points = {},
+    entry_points = {
+        'console_scripts':['ci-core-dumper=ci_core_dumper:main'],
+    },
     zip_safe = True,
 )

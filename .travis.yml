@@ -1,6 +1,5 @@
 os: linux
 language: python
-python: "2.7"
 
 addons:
   apt:
@@ -8,10 +7,15 @@ addons:
     - gdb
 
 script:
-  - sudo python -m ci_core_dumper install
+  - python -V
+  - sudo python -m ci_core_dumper -v install
   - ulimit -c unlimited
   - python build_crasher.py
-  - ./crasher abort || true
-  - ./crasher crash || true
-  - sudo python -m ci_core_dumper uninstall
-  - python -m ci_core_dumper report
+  - python test_crasher.py
+  - sudo python -m ci_core_dumper -v uninstall
+  - python -m ci_core_dumper -v report
+
+matrix:
+  include:
+    - python: "2.7"
+    - python: "3.7"

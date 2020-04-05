@@ -8,17 +8,31 @@ platform:
   - x64
 
 environment:
-  APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2015
+  matrix:
+  - APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2015
+    PATH: C:\Program Files (x86)\Windows Kits\10\Debuggers\x64;C:\Python35-x64;%PATH%
+  - APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2017
+    PATH: C:\Program Files (x86)\Windows Kits\10\Debuggers\x64;C:\Python35-x64;%PATH%
+  - APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2019
+    PATH: C:\Program Files (x86)\Windows Kits\10\Debuggers\x64;C:\Python37-x64;%PATH%
 
 build_script:
+  - cmd: python -V
   - cmd: python build_crasher.py
 
 test_script:
-  - cmd: python -m ci_core_dumper install
-  - cmd: crasher abort || echo OK
-  - cmd: crasher crash || echo OK
-  - cmd: python -m ci_core_dumper uninstall
-  - cmd: python -m ci_core_dumper report
+  - cmd: cdb -iaec "-G -c \".logopen C:\Users\appveyor\AppData\Local\Temp\1\cores\trace-$tpid.txt;~* kv n;q\""
+  - cmd: reg query "HKLM\Software\Microsoft\Windows NT\CurrentVersion\AeDebug"
+  - cmd: python -m ci_core_dumper -v install
+  - cmd: reg query "HKLM\Software\Microsoft\Windows NT\CurrentVersion\AeDebug"
+  - cmd: reg query "HKLM\Software\Wow6432Node\Microsoft\Windows NT\CurrentVersion\AeDebug"
+  - cmd: python test_crasher.py
+  - cmd: python -m ci_core_dumper -v uninstall
+  - cmd: reg query "HKLM\Software\Microsoft\Windows NT\CurrentVersion\AeDebug"
+  - cmd: python -m ci_core_dumper -v report
+
+on_finish:
+  - cmd: dir "C:\Users\appveyor\AppData\Local\Temp\1\cores"
 
 notifications:
   - provider: GitHubPullRequest

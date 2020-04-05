@@ -44,11 +44,14 @@ class CommonDumper(object):
     def catfile(self, name, sync=lambda F:None):
         sys.stdout.write('==== BEGIN: {} ====\n'.format(name))
         try:
-            with open(name, 'r', 0) as F:
+            with open(name, 'r') as F:
                 sync(F)
                 sys.stdout.write(F.read())
         except IOError as e:
-            _log.exception('Unable to read %s', name)
+            if e.errno==errno.ENOENT:
+                sys.stdout.write('==== No such file ===\n')
+            else:
+                _log.exception('Unable to read %s', name)
         sys.stdout.write('==== END: {} ====\n'.format(name))
 
 def getargs():
@@ -67,6 +70,8 @@ def getargs():
     plat = platform.system()
     if plat=='Linux':
         from .linux import LinuxDumper as Dumper
+    elif plat=='Windows':
+        from .windows import WindowsDumper as Dumper
     else:
         Dumper = CommonDumper
 
