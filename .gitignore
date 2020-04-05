@@ -1,0 +1,5 @@
+*.o
+*.pyc
+*.pyo
+crasher
+crasher.exe

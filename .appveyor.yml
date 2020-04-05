@@ -1,0 +1,24 @@
+init:
+  # Set autocrlf to make batch files work
+  - git config --global core.autocrlf true
+
+clone_depth: 5
+
+platform:
+  - x64
+
+environment:
+  APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2015
+
+build_script:
+  - cmd: python build_crasher.py
+
+test_script:
+  - cmd: python -m ci_core_dumper install
+  - cmd: crasher abort || echo OK
+  - cmd: crasher crash || echo OK
+  - cmd: python -m ci_core_dumper uninstall
+  - cmd: python -m ci_core_dumper report
+
+notifications:
+  - provider: GitHubPullRequest
