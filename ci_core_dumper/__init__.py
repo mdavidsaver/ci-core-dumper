@@ -58,7 +58,7 @@ def getargs():
     from argparse import ArgumentParser
     P = ArgumentParser(description='CI core dump analyzer.'\
         +'  Run install prior to exec of suspect code.'\
-        +'  Then uninstall and report afterwards.'\
+        +'  Then report afterwards.'\
         +'  install and uninstall require root (eg. sudo).')
 
     P.add_argument('--outdir', default=os.path.join(tempfile.gettempdir(), 'cores'),

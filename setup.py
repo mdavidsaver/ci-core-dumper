@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-from distutils import setup
+from setuptools import setup
 
 setup(
     name='ci-core-dumper',
