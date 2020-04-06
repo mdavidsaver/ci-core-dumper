@@ -142,11 +142,8 @@ q;
                 _log.debug('exec: %s', cmd)
                 LOG.flush()
 
-                # both shell=True and CREATE_NEW_PROCESS_GROUP
-                # are needed to prevent cdb from opening a window and blocking
-                #trace = SP.check_output(cmd, shell=True, stderr=SP.STDOUT, creationflags=SP.CREATE_NEW_PROCESS_GROUP)
-
-                proc = SP.Popen(cmd, stdout=SP.PIPE, stderr=SP.STDOUT, creationflags=SP.CREATE_NEW_PROCESS_GROUP)
+                proc = SP.Popen(cmd, stdout=SP.PIPE, stderr=SP.STDOUT,
+                                close_fds=False, creationflags=SP.CREATE_NEW_PROCESS_GROUP)
                 timeout = {}
                 if sys.version_info>=(3,3):
                     try:
