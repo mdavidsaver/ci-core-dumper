@@ -160,6 +160,7 @@ q
                     '-e', args.event,
                     #'-netsyms', 'no',
                     '-noio',
+                    '-lines',
                     '-g', '-G',
                     '-cf', cdbfile,
                     #'-c', 'lm;~* kv n;q;',
