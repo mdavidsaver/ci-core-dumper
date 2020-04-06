@@ -36,7 +36,7 @@ test_script:
   - ... something which might crash
 
 on_failure:
-  - ci-core-dumper report
+  - cmd: ci-core-dumper report
 ```
 
 Info on [stages](https://www.appveyor.com/docs/build-configuration/#build-pipeline).
