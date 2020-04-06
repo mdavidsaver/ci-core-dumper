@@ -18,4 +18,10 @@ script:
 matrix:
   include:
     - python: "2.7"
+      env: DEBUG=NO
     - python: "3.7"
+      env: DEBUG=NO
+    - python: "2.7"
+      env: DEBUG=YES
+    - python: "3.7"
+      env: DEBUG=YES

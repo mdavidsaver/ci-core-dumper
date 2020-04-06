@@ -58,6 +58,16 @@ def cdbsearch():
         ret.append(os.path.dirname(cdb))
     return ret
 
+def binsearch():
+    '''Find all directories containing .exe .dll and .lib
+    '''
+    ret = set()
+    for root, subdirs, files in os.walk(os.getcwd()):
+        for file in files:
+            if os.path.splitext(file)[1] in ('.exe', '.dll', '.lib'):
+                ret.add(root)
+    return list(ret)
+
 class WindowsDumper(CommonDumper):
     def install(self):
         os.environ['PATH'] = os.pathsep.join([os.environ['PATH']] + cdbsearch())
@@ -65,17 +75,23 @@ class WindowsDumper(CommonDumper):
         cdb = self.findbin(self.args.debugger or 'cdb.exe')
         cmd = self.findbin(self.args.debugger or 'cmd.exe')
 
+        sympath = binsearch()
+        [_log.debug('Sympath %s', spath) for spath in sympath]
+
         self.mkdirs(self.args.outdir)
 
         dumper = os.path.join(self.args.outdir, 'dumper.bat')
         with open(dumper, 'w') as F:
             F.write(r'''
 cd "{args.outdir}"
-echo %1 > blah.txt
 set "PYTHONPATH={cwd}"
-"{sys.executable}" -m ci_core_dumper.windows -h > help.txt
+set "_NT_SYMBOL_PATH={sympath}"
 "{sys.executable}" -m ci_core_dumper.windows --outdir "{args.outdir}" --cdb "{cdb}" --pid %1 --event %2
-'''.format(sys=sys, cwd=_root_dir, cdb=cdb, args=self.args))
+'''.format(sys=sys,
+           cwd=_root_dir,
+           cdb=cdb,
+           args=self.args,
+           sympath='*'.join(sympath)))
 
         debugger = '"{}" /c "{}" %ld %ld'.format(cmd, dumper)
 
@@ -123,20 +139,30 @@ def dump():
             LOG.write('PID: {}\n'.format(args.pid))
             try:
 
-#.logopen "{log}";
-#~* kv n;
                 with open(cdbfile, 'w') as F:
                     F.write('''
-q;
+.logopen "{log}"
+.symfix+ c:\symcache
+.sympath
+.echo Modules list
+lm;
+.echo Stacks
+~* kP n
+.echo analysis
+!analyze
+.echo End
+q
 '''.format(log=logfile))
 
                 cmd = [
                     args.cdb,
                     '-p', args.pid,
                     '-e', args.event,
+                    #'-netsyms', 'no',
+                    '-noio',
                     '-g', '-G',
-                    #'-cf', cdbfile,
-                    '-c', 'lm;~* kv n;q',
+                    '-cf', cdbfile,
+                    #'-c', 'lm;~* kv n;q;',
                 ]
 
                 _log.debug('exec: %s', cmd)
@@ -149,11 +175,17 @@ q;
                     try:
                         trace, _unused = proc.communicate(timeout=20.0)
                     except SP.TimeoutExpired:
+                        LOG.flush()
+                        LOG.seek(0,2)
                         LOG.write('cdb TIMEOUT\n')
                         proc.kill()
                         trace, _unused = proc.communicate()
                 else:
                     trace, _unused = proc.communicate()
+
+                LOG.flush()
+                LOG.seek(0,2)
+
                 code = proc.poll()
                 if code:
                     LOG.write('ERROR: {}\n'.format(code))
