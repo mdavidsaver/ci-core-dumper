@@ -9,7 +9,7 @@ Usage in Travis-CI:
 
 ```yaml
 install:
-  - pip install -e https://github.com/mdavidsaver/ci-core-dumper
+  - sudo pip install git+https://github.com/mdavidsaver/ci-core-dumper#egg=ci-core-dumper
 
 before_script:
   - sudo ci-core-dumper install
@@ -27,7 +27,7 @@ Usage in Appveyor:
 
 ```yaml
 install:
-  - cmd: pip install -e https://github.com/mdavidsaver/ci-core-dumper
+  - cmd: pip install git+https://github.com/mdavidsaver/ci-core-dumper#egg=ci-core-dumper
 
 before_test:
   - cmd: ci-core-dumper install
