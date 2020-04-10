@@ -12,6 +12,7 @@ script:
   - ulimit -c unlimited
   - python build_crasher.py
   - python test_crasher.py
+  - python -m ci_core_dumper crash
   - sudo python -m ci_core_dumper -v uninstall
   - python -m ci_core_dumper -v report
 

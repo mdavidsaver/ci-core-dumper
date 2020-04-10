@@ -54,6 +54,25 @@ class CommonDumper(object):
                 _log.exception('Unable to read %s', name)
         sys.stdout.write('==== END: {} ====\n'.format(name))
 
+    def crash(self):
+        if self.args.direct:
+            import ctypes
+            ctypes.memset(0,0,42)
+            # bang
+
+        else:
+            ret = SP.call([
+                sys.executable,
+                '-m', 'ci_core_dumper',
+                'crash', '--direct',
+            ])
+
+            if ret==0:
+                _log.error("Crash test didn't crash")
+                sys.exit(1)
+            else:
+                _log.info("Crash test successfully crashed")
+
 def getargs():
     from argparse import ArgumentParser
     P = ArgumentParser(description='CI core dump analyzer.'\
@@ -88,6 +107,13 @@ def getargs():
 
     CMD = SP.add_parser('report')
     CMD.set_defaults(func=Dumper.report)
+
+    CMD = SP.add_parser('crash')
+    CMD.add_argument('--direct', action='store_true',
+                     help='Directly crash this process.')
+    CMD.add_argument('--indirect', action='store_false', dest='direct',
+                     help='Crash a sub-process')
+    CMD.set_defaults(func=Dumper.crash)
 
     return P
 
