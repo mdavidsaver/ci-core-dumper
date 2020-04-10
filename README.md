@@ -15,6 +15,7 @@ before_script:
   - sudo ci-core-dumper install
 
 script:
+  - ulimit -c unlimited
   - ... something which might crash
 
 after_failure:
