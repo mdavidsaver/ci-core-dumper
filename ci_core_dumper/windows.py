@@ -86,21 +86,19 @@ class WindowsDumper(CommonDumper):
 cd "{args.outdir}"
 set "PYTHONPATH={cwd}"
 set "_NT_SYMBOL_PATH={sympath}"
-"{sys.executable}" -m ci_core_dumper.windows --outdir "{args.outdir}" --cdb "{cdb}" --pid %1 --event %2
+"{sys.executable}" -m ci_core_dumper.windows --outdir "{args.outdir}" --cdb "{cdb}" --arch %1 --pid %2 --event %3
 '''.format(sys=sys,
            cwd=_root_dir,
            cdb=cdb,
            args=self.args,
            sympath='*'.join(sympath)))
 
-        debugger = '"{}" /c "{}" %ld %ld'.format(cmd, dumper)
-
-        reg_replace(32, AeDebug, 'Debugger', debugger)
+        reg_replace(32, AeDebug, 'Debugger', '"{}" /c "{}" 32 %ld %ld'.format(cmd, dumper))
         reg_replace(32, AeDebug, 'Auto', '1')
         # on 64
-        reg_replace(64, AeDebug, 'Debugger', debugger)
+        reg_replace(64, AeDebug, 'Debugger', '"{}" /c "{}" 64 %ld %ld'.format(cmd, dumper))
         reg_replace(64, AeDebug, 'Auto', '1')
-        reg_replace(64, AeDebug6432, 'Debugger', debugger)
+        reg_replace(64, AeDebug6432, 'Debugger', '"{}" /c 6432 "{}" %ld %ld'.format(cmd, dumper))
         reg_replace(64, AeDebug6432, 'Auto', '1')
 
     def uninstall(self):
@@ -124,6 +122,7 @@ set "_NT_SYMBOL_PATH={sympath}"
 def getargs():
     from argparse import ArgumentParser
     P = ArgumentParser()
+    P.add_argument('--arch')
     P.add_argument('--cdb')
     P.add_argument('--pid')
     P.add_argument('--event')
@@ -136,7 +135,7 @@ def dump():
 
     logging.basicConfig(level=logging.DEBUG, filename=os.path.join(args.outdir, 'core-dumper.log'))
 
-    _log.debug('Dumping PID %s @ %s', args.pid, dtime)
+    _log.debug('Dumping PID %s @ %s of %s', args.pid, dtime, args.arch)
     try:
         os.chdir(args.outdir)
 
