@@ -149,25 +149,23 @@ def dump():
 
                 with open(cdbfile, 'w') as F:
                     F.write('''
-.logopen "{log}"
 .symfix+ c:\symcache
 .sympath
 .echo Modules list
-lm;
+lm
 .echo Stacks
 ~* kP n
 .echo analysis
 !analyze
 .echo End
 q
-'''.format(log=logfile))
+''')
 
                 cmd = [
                     args.cdb,
                     '-p', args.pid,
                     '-e', args.event,
                     #'-netsyms', 'no',
-                    '-noio',
                     '-lines',
                     '-g', '-G',
                     '-cf', cdbfile,
@@ -184,8 +182,6 @@ q
                     try:
                         trace, _unused = proc.communicate(timeout=20.0)
                     except SP.TimeoutExpired:
-                        LOG.flush()
-                        LOG.seek(0,2)
                         LOG.write('cdb TIMEOUT\n')
                         proc.kill()
                         trace, _unused = proc.communicate()
