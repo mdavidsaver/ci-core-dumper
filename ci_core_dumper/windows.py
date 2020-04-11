@@ -112,6 +112,15 @@ set "_NT_SYMBOL_PATH={sympath}"
 
         self.catfile(os.path.join(self.args.outdir, 'core-dumper.log'))
 
+    def crash(self):
+        if self.args.direct:
+            from ctypes.util import find_msvcrt
+            from ctypes import CDLL
+            CDLL(find_msvcrt() or 'msvcrt').abort()
+
+        else:
+            CommonDumper.crash(self)
+
 def getargs():
     from argparse import ArgumentParser
     P = ArgumentParser()

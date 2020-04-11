@@ -56,9 +56,7 @@ class CommonDumper(object):
 
     def crash(self):
         if self.args.direct:
-            import ctypes
-            ctypes.memset(0,0,42)
-            # bang
+            _log.error('crash Not implemented')
 
         else:
             ret = SP.call([
