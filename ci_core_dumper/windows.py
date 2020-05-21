@@ -49,6 +49,7 @@ def reg_replace(bits, kname, vname, value):
 
     winreg.SetValueEx(key, vname, 0, winreg.REG_SZ, value)
     winreg.FlushKey(key)
+    _log.debug('%s SetValue %s.%s = %s', bits, kname, vname, value)
 
     return prev
 
