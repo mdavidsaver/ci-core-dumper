@@ -12,15 +12,15 @@ install:
   - sudo pip install git+https://github.com/mdavidsaver/ci-core-dumper#egg=ci-core-dumper
 
 before_script:
-  - sudo ci-core-dumper install
+  - sudo python -m ci_core_dumper install
 
 script:
   - ulimit -c unlimited
-  - ci-core-dumper crash --direct # remove after verification
+  - python -m ci_core_dumper crash --direct # remove after verification
   - ... something which might crash
 
 after_failure:
-  - ci-core-dumper report
+  - python -m ci_core_dumper report
 ```
 
 Info on [stages](https://docs.travis-ci.com/user/job-lifecycle/#the-job-lifecycle).
@@ -32,14 +32,14 @@ install:
   - cmd: pip install git+https://github.com/mdavidsaver/ci-core-dumper#egg=ci-core-dumper
 
 before_test:
-  - cmd: ci-core-dumper install
+  - cmd: python -m ci_core_dumper install
 
 test_script:
-  - cmd: ci-core-dumper crash --direct # remove after verification
+  - cmd: python -m ci_core_dumper crash --direct # remove after verification
   - ... something which might crash
 
 on_failure:
-  - cmd: ci-core-dumper report
+  - cmd: python -m ci_core_dumper report
 ```
 
 Info on [stages](https://www.appveyor.com/docs/build-configuration/#build-pipeline).
@@ -48,16 +48,16 @@ User setup verification
 -----------------------
 
 Test crashes should be rare.
-So the best case is that ci-core-dumper is install but never used.
+So the best case is that ci-core-dumper is installed but never used.
 There is a risk of false negatives if some issue prevents ci-core-dumper from functioning correctly.
 eg. omitting 'ulimit -c unlimited'.
 
 When first setting up a new build to use ci-core-dumper it is highly recommended
-to initially include "ci-core-dumper crash --direct" as shown above.
+to initially include "python -m ci_core_dumper crash --direct" as shown above.
 This should produce a core, cause the CI build to fail,
 and result in a report.
 
-An option for later testing is to include "ci-core-dumper crash"
+An option for later testing is to include "python -m ci_core_dumper crash"
 which will produce a core file from a sub-process and then return 0.
 This will not fail the build by itself.
 However, if the build fails for other reasons, the report should show
