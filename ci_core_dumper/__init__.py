@@ -56,8 +56,7 @@ class CommonDumper(object):
 
     def crash(self):
         if self.args.direct:
-            from ._crash import crash
-            crash()
+            _log.error('crash Not implemented')
 
         else:
             ret = SP.call([

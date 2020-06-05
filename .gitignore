@@ -1,9 +1,5 @@
 *.o
 *.pyc
 *.pyo
-*.so
-*.dylib
-*.dll
-/build/
 crasher
 crasher.exe

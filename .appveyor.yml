@@ -36,7 +36,6 @@ environment:
 build_script:
   - cmd: python -V
   - cmd: python build_crasher.py
-  - cmd: python setup.py build_ext -i
   - cmd: dir
 
 test_script:
