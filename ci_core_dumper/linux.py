@@ -104,15 +104,6 @@ dump(outdir=r'{args.outdir}', gdb=r'{gdb}')
 
         self.catfile(os.path.join(self.args.outdir, 'core-dumper.log'))
 
-    def crash(self):
-        if self.args.direct:
-            from ctypes.util import find_library
-            from ctypes import CDLL
-            CDLL(find_library('c')).abort()
-
-        else:
-            CommonDumper.crash(self)
-
 def dump(outdir, gdb):
     os.umask(0o022)
 

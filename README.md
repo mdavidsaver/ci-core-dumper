@@ -16,7 +16,6 @@ before_script:
 
 script:
   - ulimit -c unlimited
-  - python -m ci_core_dumper crash --direct # remove after verification
   - ... something which might crash
 
 after_failure:
@@ -35,7 +34,6 @@ before_test:
   - cmd: python -m ci_core_dumper install
 
 test_script:
-  - cmd: python -m ci_core_dumper crash --direct # remove after verification
   - ... something which might crash
 
 on_failure:
@@ -50,18 +48,8 @@ User setup verification
 Test crashes should be rare.
 So the best case is that ci-core-dumper is installed but never used.
 There is a risk of false negatives if some issue prevents ci-core-dumper from functioning correctly.
-eg. omitting 'ulimit -c unlimited'.
+eg. omitting 'ulimit -c unlimited' on *NIX or SetErrorMode(2) on Windows.
 
-When first setting up a new build to use ci-core-dumper it is highly recommended
-to initially include "python -m ci_core_dumper crash --direct" as shown above.
-This should produce a core, cause the CI build to fail,
-and result in a report.
-
-An option for later testing is to include "python -m ci_core_dumper crash"
-which will produce a core file from a sub-process and then return 0.
-This will not fail the build by itself.
-However, if the build fails for other reasons, the report should show
-at least this one crash.
 
 Development
 -----------
