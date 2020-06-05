@@ -150,6 +150,7 @@ lm
 .echo analysis
 !analyze
 .echo End
+.kill
 q
 ''')
 
