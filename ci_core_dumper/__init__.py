@@ -4,8 +4,6 @@ import errno
 import logging
 import platform
 import tempfile
-import traceback
-import subprocess as SP
 
 _log = logging.getLogger(__name__)
 
@@ -94,5 +92,6 @@ def getargs():
 def main(args = None):
     args = getargs().parse_args(args)
     logging.basicConfig(level=args.level)
+    _log.debug('py %s', sys.executable)
     dumper = args.target(args)
     args.func(dumper)

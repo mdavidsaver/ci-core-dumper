@@ -8,11 +8,11 @@ addons:
 
 script:
   - python -V
-  - sudo python -m ci_core_dumper -v install
+  - python -m ci_core_dumper -v install
   - ulimit -c unlimited
   - python build_crasher.py
   - python test_crasher.py
-  - sudo python -m ci_core_dumper -v uninstall
+  - python -m ci_core_dumper -v uninstall
   - python -m ci_core_dumper -v report
 
 matrix:

@@ -39,9 +39,11 @@ def syncfd(F):
 
 class LinuxDumper(CommonDumper):
     def install(self):
+        self.sudo()
+
         gdb = self.findbin(self.args.debugger or 'gdb')
 
-        with open(core_pattern, 'rb') as F:
+        with open(core_pattern, 'r') as F:
             current = F.read()
         _log.debug('Current core_pattern: %s', current)
 
@@ -77,9 +79,11 @@ dump(outdir=r'{args.outdir}', gdb=r'{gdb}')
             raise
 
     def uninstall(self):
+        self.sudo()
+
         save = os.path.join(self.args.outdir, 'core_pattern')
         try:
-            with open(save, 'rb') as F:
+            with open(save, 'r') as F:
                 current = F.read()
         except IOError as e:
             if e.errno==errno.ENOENT:
@@ -88,7 +92,7 @@ dump(outdir=r'{args.outdir}', gdb=r'{gdb}')
             raise
 
         try:
-            with open(core_pattern, 'wb') as F:
+            with open(core_pattern, 'w') as F:
                 F.write(current)
         except IOError as e:
             if e.errno==errno.EACCES:
@@ -103,6 +107,24 @@ dump(outdir=r'{args.outdir}', gdb=r'{gdb}')
             self.catfile(log, sync=syncfd)
 
         self.catfile(os.path.join(self.args.outdir, 'core-dumper.log'))
+
+    def sudo(self):
+        who = os.geteuid()
+        _log.info('IAM %d', who)
+        if os.geteuid()==0:
+            return
+        _log.info('Attempting to acquire privlage for %s', os.geteuid())
+
+        try:
+            sudo = [self.findbin('sudo'), sys.executable, '-m', 'ci_core_dumper'] + sys.argv[1:]
+            _log.debug('EXEC %s', sudo)
+            ret = SP.call(sudo)
+        except:
+            _log.exception('Unable to acquire permission')
+            # soft-fail and attempt to continue
+
+        if ret==0:
+            sys.exit(0)
 
 def dump(outdir, gdb):
     os.umask(0o022)
@@ -151,7 +173,7 @@ def dump(outdir, gdb):
             LOG.flush()
 
             with open(os.devnull, 'r') as NULL:
-                trace = SP.check_output(cmd, stdin=NULL, stderr=SP.STDOUT)
+                trace = SP.check_output(cmd, stdin=NULL, stderr=SP.STDOUT).decode('utf-8', 'replace')
 
             LOG.write(trace)
             LOG.write('\nComplete\n')
