@@ -4,6 +4,7 @@ import errno
 import logging
 import platform
 import tempfile
+import subprocess as SP
 
 _log = logging.getLogger(__name__)
 
@@ -16,19 +17,25 @@ class CommonDumper(object):
 
     # sub-class hooks
     def install(self):
-        _log.info('core file analysis not implemented for this target')
+        _log.warn('core file analysis not implemented for this target')
     def uninstall(self):
         pass
     def report(self):
-        _log.info('core file analysis not implemented for this target')
+        _log.warn('core file analysis not implemented for this target')
+
+    def doexec(self):
+        cmd = [self.findbin(self.args.command)] + self.args.args
+        _log.debug('EXEC %s', cmd)
+        sys.exit(SP.call(cmd))
 
     # utilities
     def findbin(self, name):
         search = ['.']+os.environ['PATH'].split(os.pathsep)
         for path in search:
-            cand = os.path.join(path, name)
-            if os.path.isfile(cand):
-                return cand
+            for suf in ('', '.exe'):
+                cand = os.path.join(path, name+suf)
+                if os.path.isfile(cand):
+                    return cand
         raise RuntimeError("Unable to find {} in {}".format(name, search))
 
     def mkdirs(self, name):
@@ -53,7 +60,7 @@ class CommonDumper(object):
         sys.stdout.write('==== END: {} ====\n'.format(name))
 
 def getargs():
-    from argparse import ArgumentParser
+    from argparse import ArgumentParser, REMAINDER
     P = ArgumentParser(description='CI core dump analyzer.'\
         +'  Run install prior to exec of suspect code.'\
         +'  Then report afterwards.'\
@@ -66,6 +73,7 @@ def getargs():
                    action='store_const', const=logging.DEBUG)
 
     plat = platform.system()
+    _log.debug('platform %s', plat)
     if plat=='Linux':
         from .linux import LinuxDumper as Dumper
     elif plat=='Windows':
@@ -86,6 +94,11 @@ def getargs():
 
     CMD = SP.add_parser('report')
     CMD.set_defaults(func=Dumper.report)
+
+    CMD = SP.add_parser('exec')
+    CMD.add_argument('command')
+    CMD.add_argument('args', nargs=REMAINDER)
+    CMD.set_defaults(func=Dumper.doexec)
 
     return P
 

@@ -11,7 +11,7 @@ script:
   - python -m ci_core_dumper -v install
   - ulimit -c unlimited
   - python build_crasher.py
-  - python test_crasher.py
+  - python -m ci_core_dumper exec python test_crasher.py
   - python -m ci_core_dumper -v uninstall
   - python -m ci_core_dumper -v report
 
@@ -25,3 +25,6 @@ matrix:
       env: DEBUG=YES
     - python: "3.7"
       env: DEBUG=YES
+    - language: cpp
+      env: DEBUG=YES
+      os: windows

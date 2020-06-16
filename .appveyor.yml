@@ -42,7 +42,7 @@ test_script:
   - cmd: python -m ci_core_dumper -v install
   - cmd: reg query "HKLM\Software\Microsoft\Windows NT\CurrentVersion\AeDebug"
   - cmd: reg query "HKLM\Software\Wow6432Node\Microsoft\Windows NT\CurrentVersion\AeDebug"
-  - cmd: python test_crasher.py
+  - cmd: python -m ci_core_dumper -v exec python test_crasher.py
   - cmd: python -m ci_core_dumper -v uninstall
   - cmd: python -m ci_core_dumper -v report
 

@@ -10,6 +10,7 @@ import time
 import logging
 import errno
 import traceback
+import ctypes
 import subprocess as SP
 from glob import glob
 
@@ -54,8 +55,9 @@ def reg_replace(bits, kname, vname, value):
     return prev
 
 def cdbsearch():
+    arch = os.environ.get('PLATFORM', 'x64').lower()
     ret = []
-    for cdb in glob(r'C:\Program Files (x86)\Windows Kits\*\Debuggers\{}\cdb.exe'.format(os.environ['PLATFORM'].lower())):
+    for cdb in glob(r'C:\Program Files (x86)\Windows Kits\*\Debuggers\{}\cdb.exe'.format(arch)):
         ret.append(os.path.dirname(cdb))
     return ret
 
@@ -71,6 +73,7 @@ def binsearch():
 
 class WindowsDumper(CommonDumper):
     def install(self):
+        self.ErrorMode()
         os.environ['PATH'] = os.pathsep.join([os.environ['PATH']] + cdbsearch())
 
         cdb = self.findbin(self.args.debugger or 'cdb.exe')
@@ -110,6 +113,23 @@ set "_NT_SYMBOL_PATH={sympath}"
             self.catfile(log, sync=syncfd)
 
         self.catfile(os.path.join(self.args.outdir, 'core-dumper.log'))
+
+    def doexec(self):
+        self.ErrorMode()
+        CommonDumper.doexec(self)
+
+    def ErrorMode(self):
+        # https://docs.microsoft.com/en-us/windows/win32/api/errhandlingapi/nf-errhandlingapi-seterrormode?redirectedfrom=MSDN
+        # SEM_NOGPFAULTERRORBOX (2) has the undocumented side-effect of preventing
+        # AeDebug from being triggered.
+        errmode = ctypes.windll.kernel32.GetErrorMode()
+        if errmode&2:
+            _log.warn('Environment sets SEM_NOGPFAULTERRORBOX which disables AeDebug.')
+            _log.warn('Ensure that test runners call SetErrorMode(GetErrorMode()&~SEM_NOGPFAULTERRORBOX)')
+            _log.warn('Or call through ci-core-dumper exec cmd args...')
+            errmode &= ~2
+            errmode = ctypes.windll.kernel32.SetErrorMode(errmode)
+        _log.debug('SetErrorMode(0x%d)', errmode)
 
 def getargs():
     from argparse import ArgumentParser
