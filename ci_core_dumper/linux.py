@@ -116,7 +116,8 @@ dump(outdir=r'{args.outdir}', gdb=r'{gdb}')
         _log.info('Attempting to acquire privlage for %s', os.geteuid())
 
         try:
-            sudo = [self.findbin('sudo'), sys.executable, '-m', 'ci_core_dumper'] + sys.argv[1:]
+            sudo = [self.findbin('sudo'), 'PYTHONPATH='+os.environ.get('PYTHONPATH',''),
+                    sys.executable, '-m', 'ci_core_dumper'] + sys.argv[1:]
             _log.debug('EXEC %s', sudo)
             ret = SP.call(sudo)
         except:
