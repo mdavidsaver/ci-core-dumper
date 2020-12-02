@@ -12,6 +12,8 @@ _log = logging.getLogger(__name__)
 _root_dir = os.path.abspath(os.path.dirname(os.path.dirname(__file__)))
 
 class CommonDumper(object):
+    inactions = 'GITHUB_ACTIONS' in os.environ
+
     def __init__(self, args):
         self.args = args
 
@@ -47,6 +49,8 @@ class CommonDumper(object):
             # EEXIST is expected
 
     def catfile(self, name, sync=lambda F:None):
+        if self.inactions:
+            sys.stdout.write('::group::%s\n'%name)
         sys.stdout.write('==== BEGIN: {} ====\n'.format(name))
         try:
             with open(name, 'r') as F:
@@ -58,6 +62,8 @@ class CommonDumper(object):
             else:
                 _log.exception('Unable to read %s', name)
         sys.stdout.write('==== END: {} ====\n'.format(name))
+        if self.inactions:
+            sys.stdout.write('::endgroup::\n')
 
 def getargs():
     from argparse import ArgumentParser, REMAINDER

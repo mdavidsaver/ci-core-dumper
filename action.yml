@@ -1,0 +1,6 @@
+name: 'Automatic core dump analysis'
+description: 'Automatically provide stack traces of crashing processes'
+runs:
+  using: 'node12'
+  main: 'prepare.js'
+  post: 'analyze.js'

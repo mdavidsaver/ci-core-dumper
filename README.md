@@ -3,7 +3,25 @@ ci-core-dumper
 
 A utility to automate analysis of core dumps from crashes during CI builds and test runs.
 
-Support Linux (Travis-CI) and Windows (Appveyor).
+Support Linux (Github Actions, Travis-CI) and Windows (Appveyor, Github Actions, Travis-CI).
+
+Usage on Github Actions:
+
+```yaml
+...
+jobs:
+  test:
+    runs-on: ${{ matrix.os }}
+    name: My Job
+    steps:
+      - uses: actions/checkout@v2
+      - uses: mdavidsaver/ci-core-dumper@master
+      - runs: |
+         ulimit -c unlimited
+         ... something which might crash
+```
+
+With Github Actions only, a dummy 'ulimit' command is provided on Windows.
 
 Usage in Travis-CI:
 

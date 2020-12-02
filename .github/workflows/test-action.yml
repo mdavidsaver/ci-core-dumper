@@ -1,0 +1,30 @@
+name: Test ci-core-dumper
+
+on: [push, pull_request]
+
+jobs:
+  test:
+    runs-on: ${{ matrix.os }}
+    name: Crash Test
+    strategy:
+      fail-fast: false
+      matrix:
+        os: ["ubuntu-latest", "windows-latest", "macos-latest"]
+        python-version: [2.7, 3.5, 3.6, 3.7, 3.8]
+    steps:
+      - uses: actions/checkout@v2
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v2
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Builder Info
+        run: |
+          which python
+          python --version
+      - uses: ./
+      - name: Test
+        run: |
+          python build_crasher.py
+          python -m ci_core_dumper exec python test_crasher.py
+          ulimit -c unlimited
+          python test_crasher.py
