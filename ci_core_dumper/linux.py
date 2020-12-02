@@ -13,6 +13,7 @@ import errno
 import logging
 import fcntl
 import traceback
+import resource
 import subprocess as SP
 from glob import glob
 
@@ -107,6 +108,13 @@ dump(outdir=r'{args.outdir}', gdb=r'{gdb}')
             self.catfile(log, sync=syncfd)
 
         self.catfile(os.path.join(self.args.outdir, 'core-dumper.log'))
+
+    def doexec(self):
+        # raise core file limit for self and child
+        S, H = resource.getrlimit(resource.RLIMIT_CORE)
+        resource.setrlimit(resource.RLIMIT_CORE, (H, H))
+        _log.debug('adjust ulimit -c%d', H)
+        CommonDumper.doexec(self)
 
     def sudo(self):
         who = os.geteuid()
