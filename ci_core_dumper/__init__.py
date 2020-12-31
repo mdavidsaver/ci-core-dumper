@@ -19,11 +19,11 @@ class CommonDumper(object):
 
     # sub-class hooks
     def install(self):
-        _log.warn('core file analysis not implemented for this target')
+        _log.warn('core file analysis not implemented for %s'%platform.system())
     def uninstall(self):
         pass
     def report(self):
-        _log.warn('core file analysis not implemented for this target')
+        _log.warn('core file analysis not implemented for %s'%platform.system())
 
     def doexec(self):
         cmd = [self.findbin(self.args.command)] + self.args.args
@@ -84,6 +84,8 @@ def getargs():
         from .linux import LinuxDumper as Dumper
     elif plat=='Windows':
         from .windows import WindowsDumper as Dumper
+    elif plat=='Darwin':
+        from .osx import DarwinDumper as Dumper
     else:
         Dumper = CommonDumper
 
