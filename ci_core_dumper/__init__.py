@@ -16,6 +16,7 @@ class CommonDumper(object):
 
     def __init__(self, args):
         self.args = args
+        self.exit = 0
 
     # sub-class hooks
     def install(self):
@@ -47,6 +48,13 @@ class CommonDumper(object):
             if e.errno!=errno.EEXIST:
                 raise
             # EEXIST is expected
+
+    def error(self, msg, code=1):
+        self.exit = max(self.exit, code)
+        if self.inactions:
+            sys.stdout.write('::error::Core Dump %s\n'%msg)
+        else:
+            sys.stdout.write('Core Dump: %s\n'%msg)
 
     def catfile(self, name, sync=lambda F:None):
         if self.inactions:
@@ -116,3 +124,4 @@ def main(args = None):
     _log.debug('py %s', sys.executable)
     dumper = args.target(args)
     args.func(dumper)
+    sys.exit(dumper.exit)

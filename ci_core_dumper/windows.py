@@ -110,6 +110,7 @@ set "_NT_SYMBOL_PATH={sympath}"
 
     def report(self):
         for log in glob(os.path.join(self.args.outdir, '*.txt')):
+            self.error(log)
             self.catfile(log, sync=syncfd)
 
         self.catfile(os.path.join(self.args.outdir, 'core-dumper.log'))

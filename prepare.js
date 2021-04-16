@@ -55,3 +55,4 @@ spawnSync(
     ['-m', 'ci_core_dumper', '-v', 'install'].concat(argv.slice(2)),
     {stdio: ['ignore', 'inherit', 'inherit']},
 )
+console.log("::endgroup::")

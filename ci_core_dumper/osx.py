@@ -20,4 +20,5 @@ class DarwinDumper(CommonDumper):
 
         for path in ('~/Library/Logs/DiagnosticReports/*.crash', '~/Library/Logs/CrashReporter/*.crash'):
             for report in glob(os.path.expanduser(path)):
+                self.error(report)
                 self.catfile(report)
