@@ -72,10 +72,13 @@ dump(outdir=r'{args.outdir}', gdb=r'{gdb}')
 
         try:
             with open(core_pattern, 'w') as F:
-                F.write('|{} %p %t'.format(dumper))
+                F.write('|{} %p %P %t'.format(dumper))
         except IOError as e:
             if e.errno==errno.EACCES:
                 _log.error('Insufficient permission to open "{}".  sudo?'.format(core_pattern))
+                return # soft-fail
+            elif e.errno==errno.EROFS:
+                _log.error('Unable to open "{}" Read-only FS.  docker?'.format(core_pattern))
                 return # soft-fail
             raise
 
@@ -139,14 +142,14 @@ dump(outdir=r'{args.outdir}', gdb=r'{gdb}')
 def dump(outdir, gdb):
     os.umask(0o022)
 
-    pid, dtime = int(sys.argv[1]), int(sys.argv[2])
+    pid, hpid, dtime = int(sys.argv[1]), int(sys.argv[2]), int(sys.argv[3])
 
     logging.basicConfig(level=logging.DEBUG, filename=os.path.join(outdir, 'core-dumper.log'))
 
     _log.debug('Dumping PID %s @ %s', pid, dtime)
 
-    corefile = os.path.join(outdir, '{}.{}.core'.format(dtime, pid))
-    logfile  = os.path.join(outdir, '{}.{}.txt' .format(dtime, pid))
+    corefile = os.path.join(outdir, '{}.{}.core'.format(dtime, hpid))
+    logfile  = os.path.join(outdir, '{}.{}.txt' .format(dtime, hpid))
 
     with open(logfile, 'w') as LOG, FLock(LOG):
         try:
@@ -157,8 +160,8 @@ def dump(outdir, gdb):
                 IF = sys.stdin # py2 (!win32)
 
             # read info from /proc of dump'd process
-            exe = os.readlink('/proc/{}/exe'.format(pid))
-            with open('/proc/{}/cmdline'.format(pid), 'rb') as F:
+            exe = os.readlink('/proc/{}/exe'.format(hpid))
+            with open('/proc/{}/cmdline'.format(hpid), 'rb') as F:
                 cmdline = [arg.decode('ascii') for arg in F.read().split(b'\0')]
             cmdline.pop() # result of final nil
 
@@ -171,21 +174,28 @@ def dump(outdir, gdb):
                     if not blob:
                         break
                     OF.write(blob)
+            # /proc/<hpid> has now disappeared
 
-            cmd = [
-                gdb,
-                '--nx', '--nw', '--batch', # no .gitinit, no UI, no interactive
-                '-ex', 'set pagination 0',
-                '-ex', 'thread apply all bt',
-                exe, corefile
-            ]
-            _log.debug('exec: %s', cmd)
-            LOG.flush()
+            if pid!=hpid:
+                LOG.write('Crashing process is %d in a container.'%pid)
+                LOG.write('Analysis not implemented')
+                # would need to access container mount namespace
 
-            with open(os.devnull, 'r') as NULL:
-                trace = SP.check_output(cmd, stdin=NULL, stderr=SP.STDOUT).decode('utf-8', 'replace')
+            else:
+                cmd = [
+                    gdb,
+                    '--nx', '--nw', '--batch', # no .gitinit, no UI, no interactive
+                    '-ex', 'set pagination 0',
+                    '-ex', 'thread apply all bt',
+                    exe, corefile
+                ]
+                _log.debug('exec: %s', cmd)
+                LOG.flush()
 
-            LOG.write(trace)
+                with open(os.devnull, 'r') as NULL:
+                    trace = SP.check_output(cmd, stdin=NULL, stderr=SP.STDOUT).decode('utf-8', 'replace')
+
+                LOG.write(trace)
             LOG.write('\nComplete\n')
 
         except:

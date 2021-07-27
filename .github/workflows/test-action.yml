@@ -40,6 +40,7 @@ jobs:
             piparch: manylinux1_x86_64
     steps:
       - uses: actions/checkout@v2
+      - uses: ./
       - name: Docker
         run: |
           # can't use GHA native docker support since GHA magic binaries need .so absent from old manylinux images :(
@@ -49,13 +50,6 @@ jobs:
           cd /io
           export PATH="/opt/python/${{ matrix.pyver }}/bin:\$PATH"
           which python
-          python -m pip install -U pip
-
-          yum -y install gdb
-
-          python -m pip install -v .
-          python -m ci_core_dumper install
-          trap 'python -m ci_core_dumper report' EXIT INT QUIT TERM
 
           python build_crasher.py
           python -m ci_core_dumper exec python test_crasher.py
