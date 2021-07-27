@@ -5,7 +5,7 @@ on: [push, pull_request]
 jobs:
   test:
     runs-on: ${{ matrix.os }}
-    name: Crash Test
+    name: Crash Test ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
@@ -28,3 +28,40 @@ jobs:
           python -m ci_core_dumper exec python test_crasher.py
           ulimit -c unlimited
           python test_crasher.py
+
+  docker:
+    runs-on: ubuntu-latest
+    name: Docker
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - pyver: cp27-cp27m
+            piparch: manylinux1_x86_64
+    steps:
+      - uses: actions/checkout@v2
+      - name: Docker
+        run: |
+          # can't use GHA native docker support since GHA magic binaries need .so absent from old manylinux images :(
+          cat <<EOF > runit.sh
+          #!/bin/sh
+          set -e -x
+          cd /io
+          export PATH="/opt/python/${{ matrix.pyver }}/bin:\$PATH"
+          which python
+          python -m pip install -U pip
+
+          yum -y install gdb
+
+          python -m pip install -v .
+          python -m ci_core_dumper install
+          trap 'python -m ci_core_dumper report' EXIT INT QUIT TERM
+
+          python build_crasher.py
+          python -m ci_core_dumper exec python test_crasher.py
+
+          EOF
+          cat runit.sh
+          chmod +x runit.sh
+          docker pull quay.io/pypa/${{ matrix.piparch }}
+          docker run --privileged --rm -v `pwd`:/io quay.io/pypa/${{ matrix.piparch }} ${{ matrix.pre }} /io/runit.sh
