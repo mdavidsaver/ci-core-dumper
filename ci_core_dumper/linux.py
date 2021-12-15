@@ -40,6 +40,7 @@ def syncfd(F):
 
 class LinuxDumper(CommonDumper):
     def install(self):
+        self.fix_parent()
         self.sudo()
 
         gdb = self.findbin(self.args.debugger or 'gdb')
@@ -121,7 +122,27 @@ dump(outdir=r'{args.outdir}', gdb=r'{gdb}', extra_cmds={cmds!r})
         _log.debug('adjust ulimit -c%d', H)
         CommonDumper.doexec(self)
 
+    def fix_parent(self):
+        '''Attempt to adjust core dump limits of parent so that
+           it can be inherited by future siblings (tests which might crash).
+
+           Allow us to "just work" even if caller has forgotten to raise
+           the core limit, and doesn't use our 'exec' sub-command.
+        '''
+        if not hasattr(resource, 'prlimit'):
+            return # py < 3.4
+        try:
+            ppid = os.getppid() # Parent PID
+            S, H = resource.prlimit(ppid, resource.RLIMIT_CORE)
+            resource.prlimit(ppid, resource.RLIMIT_CORE, (H, H))
+            _log.debug('adjust parent %d ulimit -c%d', ppid, H)
+
+        except:
+            _log.exception('Unable to "ulimit -c unlimited" for parent')
+
     def sudo(self):
+        '''re-exec myself w/ sudo
+        '''
         who = os.geteuid()
         _log.info('IAM %d', who)
         if os.geteuid()==0:
