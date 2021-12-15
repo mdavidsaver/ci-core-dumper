@@ -147,7 +147,7 @@ dump(outdir=r'{args.outdir}', gdb=r'{gdb}', extra_cmds={cmds!r})
         _log.info('IAM %d', who)
         if os.geteuid()==0:
             return
-        _log.info('Attempting to acquire privlage for %s', os.geteuid())
+        _log.info('Attempting to acquire privilege for %s', os.geteuid())
 
         try:
             sudo = [self.findbin('sudo'), 'PYTHONPATH='+os.environ.get('PYTHONPATH',''),

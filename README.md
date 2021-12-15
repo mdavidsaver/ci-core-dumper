@@ -3,7 +3,12 @@ ci-core-dumper
 
 A utility to automate analysis of core dumps from crashes during CI builds and test runs.
 
-Support Linux (Github Actions, Travis-CI) and Windows (Appveyor, Github Actions, Travis-CI).
+Support Linux, OSX (somewhat), and Windows.
+Tested with Appveyor, Github Actions, Travis-CI.
+
+On Linux, uses the corepattern facility to capture, and analyzes with GDB.
+On OSX, find and print any CrashReporter logs.
+On Windows, uses the AeDebug facility to capture, and analyzes with CDB.
 
 Usage on Github Actions:
 
