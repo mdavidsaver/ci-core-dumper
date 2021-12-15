@@ -60,11 +60,12 @@ class LinuxDumper(CommonDumper):
 import sys
 sys.path.append(r'{cwd}')
 from ci_core_dumper.linux import dump
-dump(outdir=r'{args.outdir}', gdb=r'{gdb}')
+dump(outdir=r'{args.outdir}', gdb=r'{gdb}', extra_cmds={cmds!r})
 '''.format(sys=sys,
            args=self.args,
            gdb=gdb,
            cwd=_root_dir,
+           cmds=self.args.gdb_cmds.split(';'),
            ))
 
         # executable
@@ -139,7 +140,7 @@ dump(outdir=r'{args.outdir}', gdb=r'{gdb}')
         if ret==0:
             sys.exit(0)
 
-def dump(outdir, gdb):
+def dump(outdir, gdb, extra_cmds):
     os.umask(0o022)
 
     pid, hpid, dtime = int(sys.argv[1]), int(sys.argv[2]), int(sys.argv[3])
@@ -187,6 +188,10 @@ def dump(outdir, gdb):
                     '--nx', '--nw', '--batch', # no .gitinit, no UI, no interactive
                     '-ex', 'set pagination 0',
                     '-ex', 'thread apply all bt',
+                ]
+                for extra in extra_cmds:
+                    cmd += ['-ex', extra]
+                cmd += [
                     exe, corefile
                 ]
                 _log.debug('exec: %s', cmd)

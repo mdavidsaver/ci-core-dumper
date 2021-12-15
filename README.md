@@ -68,6 +68,21 @@ So the best case is that ci-core-dumper is installed but never used.
 There is a risk of false negatives if some issue prevents ci-core-dumper from functioning correctly.
 eg. omitting 'ulimit -c unlimited' on *NIX or SetErrorMode(2) on Windows.
 
+Extra Commands
+--------------
+
+The action arguments `extra_cdb:` and `extra_gdb:` can be used to pass
+a semicolon separated list of extra debugger commands to CDB or GDB.  eg.
+
+```yaml
+...
+jobs:
+...
+      - uses: mdavidsaver/ci-core-dumper@master
+        with:
+          extra_gdb: "info auto-load"
+```
+
 
 Development
 -----------

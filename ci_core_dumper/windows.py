@@ -90,6 +90,7 @@ class WindowsDumper(CommonDumper):
 cd "{args.outdir}"
 set "PYTHONPATH={cwd}"
 set "_NT_SYMBOL_PATH={sympath}"
+set "CICD_EXTRA_CDB={args.cdb_cmds}"
 "{sys.executable}" -m ci_core_dumper.windows --outdir "{args.outdir}" --cdb "{cdb}" --arch %1 --pid %2 --event %3
 '''.format(sys=sys,
            cwd=_root_dir,
@@ -156,7 +157,7 @@ def dump():
         logfile  = '{}.{}.txt'.format(dtime, args.pid)
         lckfile = logfile+'.lck'
 
-        with open(lckfile, 'w') as LCK, open(logfile, 'w') as LOG:
+        with open(lckfile, 'w'), open(logfile, 'w') as LOG:
             LOG.write('PID: {}\n'.format(args.pid))
             try:
 
@@ -170,6 +171,11 @@ lm
 ~* kP n
 .echo analysis
 !analyze
+''')
+
+                    F.write(os.environ['CICD_EXTRA_CDB'].replace(';', '\n'))
+
+                    F.write('''
 .echo End
 .kill
 q
@@ -191,7 +197,7 @@ q
 
                 proc = SP.Popen(cmd, stdout=SP.PIPE, stderr=SP.STDOUT,
                                 close_fds=False, creationflags=SP.CREATE_NEW_PROCESS_GROUP)
-                timeout = {}
+
                 if sys.version_info>=(3,3):
                     try:
                         trace, _unused = proc.communicate(timeout=20.0)

@@ -1,5 +1,14 @@
 name: 'Automatic core dump analysis'
 description: 'Automatically provide stack traces of crashing processes'
+inputs:
+  extra_cdb:
+    description: Extra commands for CDB, separated by semicolons
+    required: false
+    default: ''
+  extra_gdb:
+    description: Extra commands for GDB, separated by semicolons
+    required: false
+    default: ''
 runs:
   using: 'node12'
   main: 'prepare.js'

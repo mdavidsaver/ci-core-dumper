@@ -1,8 +1,9 @@
 const { spawnSync } = require('child_process');
-const { argv, stdout, stderr } = require('process');
+const { argv, stdout, stderr, env } = require('process');
 const os = require('os');
 
-console.log(argv[1]);
+const cdb_args = env['INPUT_EXTRA_CDB']||'';
+const gdb_args = env['INPUT_EXTRA_GDB']||'';
 
 if(os.type()=='Linux') {
     console.log('::group::Install GDB')
@@ -52,7 +53,10 @@ if(os.type()=='Windows_NT') {
 console.log('::group::ci-core-dumper install')
 spawnSync(
     'python',
-    ['-m', 'ci_core_dumper', '-v', 'install'].concat(argv.slice(2)),
+    ['-m', 'ci_core_dumper', '-v', 'install',
+        '--cdb-commands', cdb_args,
+        '--gdb-commands', gdb_args,
+    ].concat(argv.slice(2)),
     {stdio: ['ignore', 'inherit', 'inherit']},
 )
 console.log("::endgroup::")

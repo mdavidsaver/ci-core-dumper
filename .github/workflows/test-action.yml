@@ -22,6 +22,8 @@ jobs:
           which python
           python --version
       - uses: ./
+        with:
+          extra_gdb: "info auto-load"
       - name: Test
         run: |
           python build_crasher.py

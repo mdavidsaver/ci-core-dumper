@@ -105,6 +105,14 @@ def getargs():
     CMD.add_argument('--gdb', dest='debugger')
     CMD.set_defaults(func=Dumper.install)
 
+    CMD.add_argument("--gdb-commands",
+                     dest='gdb_cmds', default='',
+                     help='Colon separated list of extra GDB commands')
+
+    CMD.add_argument("--cdb-commands",
+                     dest='cdb_cmds', default='',
+                     help='Colon separated list of extra CDB commands')
+
     CMD = SP.add_parser('uninstall')
     CMD.set_defaults(func=Dumper.uninstall)
 
