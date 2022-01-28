@@ -3,9 +3,6 @@
 from __future__ import print_function
 
 from distutils.ccompiler import new_compiler
-from distutils.spawn import spawn
-import distutils.sysconfig
-import sys
 import os
 import platform
 from functools import partial
