@@ -11,6 +11,10 @@ jobs:
       matrix:
         os: ["ubuntu-latest", "windows-latest", "macos-latest"]
         python-version: [2.7, 3.5, 3.6, 3.7, 3.8]
+        exclude:
+          # VM image lacks old VS needed
+          - os: windows-latest
+            python-version: 2.7
     steps:
       - uses: actions/checkout@v2
       - name: Set up Python ${{ matrix.python-version }}
