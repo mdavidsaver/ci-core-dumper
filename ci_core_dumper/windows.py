@@ -77,7 +77,6 @@ class WindowsDumper(CommonDumper):
         os.environ['PATH'] = os.pathsep.join([os.environ['PATH']] + cdbsearch())
 
         cdb = self.findbin(self.args.debugger or 'cdb.exe')
-        cmd = self.findbin(self.args.debugger or 'cmd.exe')
 
         sympath = binsearch()
         [_log.debug('Sympath %s', spath) for spath in sympath]
@@ -87,23 +86,29 @@ class WindowsDumper(CommonDumper):
         dumper = os.path.join(self.args.outdir, 'dumper.bat')
         with open(dumper, 'w') as F:
             F.write(r'''
-cd "{args.outdir}"
-set "PYTHONPATH={cwd}"
-set "_NT_SYMBOL_PATH={sympath}"
-set "CICD_EXTRA_CDB={args.cdb_cmds}"
-"{sys.executable}" -m ci_core_dumper.windows --outdir "{args.outdir}" --cdb "{cdb}" --arch %1 --pid %2 --event %3
-'''.format(sys=sys,
-           cwd=_root_dir,
+import os
+import sys
+import subprocess
+os.environ['_NT_SYMBOL_PATH'] = {sympath!r}
+sys.path.append({cwd!r})
+from ci_core_dumper.windows import dump
+dump(*sys.argv[1:4],
+    outdir={args.outdir!r},
+    cdb={cdb!r},
+    cdb_extra={cdb_cmds!r},
+)
+'''.format(cwd=_root_dir,
            cdb=cdb,
+           cdb_cmds=self.args.cdb_cmds.replace(';', '\n'),
            args=self.args,
            sympath='*'.join(sympath)))
 
-        reg_replace(32, AeDebug, 'Debugger', '"{}" /c "{}" 32 %ld %ld'.format(cmd, dumper))
+        reg_replace(32, AeDebug, 'Debugger', '"{}" "{}" 32 %ld %ld'.format(sys.executable, dumper))
         reg_replace(32, AeDebug, 'Auto', '1')
         # on 64
-        reg_replace(64, AeDebug, 'Debugger', '"{}" /c "{}" 64 %ld %ld'.format(cmd, dumper))
+        reg_replace(64, AeDebug, 'Debugger', '"{}" "{}" 64 %ld %ld'.format(sys.executable, dumper))
         reg_replace(64, AeDebug, 'Auto', '1')
-        reg_replace(64, AeDebug6432, 'Debugger', '"{}" /c 6432 "{}" %ld %ld'.format(cmd, dumper))
+        reg_replace(64, AeDebug6432, 'Debugger', '"{}" 6432 "{}" %ld %ld'.format(sys.executable, dumper))
         reg_replace(64, AeDebug6432, 'Auto', '1')
 
     def uninstall(self):
@@ -133,32 +138,21 @@ set "CICD_EXTRA_CDB={args.cdb_cmds}"
             errmode = ctypes.windll.kernel32.SetErrorMode(errmode)
         _log.debug('SetErrorMode(0x%d)', errmode)
 
-def getargs():
-    from argparse import ArgumentParser
-    P = ArgumentParser()
-    P.add_argument('--arch')
-    P.add_argument('--cdb')
-    P.add_argument('--pid')
-    P.add_argument('--event')
-    P.add_argument('--outdir')
-    return P
-
-def dump():
+def dump(arch, pid, event, outdir=None, cdb=None, cdb_extra=None):
     dtime = time.time()
-    args = getargs().parse_args()
 
-    logging.basicConfig(level=logging.DEBUG, filename=os.path.join(args.outdir, 'core-dumper.log'))
+    logging.basicConfig(level=logging.DEBUG, filename=os.path.join(outdir, 'core-dumper.log'))
 
-    _log.debug('Dumping PID %s @ %s of %s', args.pid, dtime, args.arch)
+    _log.debug('Dumping PID %s @ %s of %s', pid, dtime, arch)
     try:
-        os.chdir(args.outdir)
+        os.chdir(outdir)
 
-        cdbfile = '{}.{}.cdb'.format(dtime, args.pid)
-        logfile  = '{}.{}.txt'.format(dtime, args.pid)
+        cdbfile = '{}.{}.cdb'.format(dtime, pid)
+        logfile  = '{}.{}.txt'.format(dtime, pid)
         lckfile = logfile+'.lck'
 
         with open(lckfile, 'w'), open(logfile, 'w') as LOG:
-            LOG.write('PID: {}\n'.format(args.pid))
+            LOG.write('PID: {}\n'.format(pid))
             try:
 
                 with open(cdbfile, 'w') as F:
@@ -171,20 +165,16 @@ lm
 ~* kP n
 .echo analysis
 !analyze
-''')
-
-                    F.write(os.environ['CICD_EXTRA_CDB'].replace(';', '\n'))
-
-                    F.write('''
+{cdb_extra}
 .echo End
 .kill
 q
-''')
+'''.format(cdb_extra=cdb_extra))
 
                 cmd = [
-                    args.cdb,
-                    '-p', args.pid,
-                    '-e', args.event,
+                    cdb,
+                    '-p', pid,
+                    '-e', event,
                     #'-netsyms', 'no',
                     '-lines',
                     '-g', '-G',
@@ -228,6 +218,3 @@ q
         _log.exception('oops')
     finally:
         os.remove(lckfile)
-
-if __name__=='__main__':
-    dump()
