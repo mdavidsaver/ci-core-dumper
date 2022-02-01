@@ -8,21 +8,100 @@ GDB to produce stack traces.
 """
 # SPDX-License-Identifier: GPL-3.0-or-later
 
+from __future__ import print_function
+
 import sys
 import os
+import time
 import errno
+import ctypes
 import logging
 import fcntl
+import shutil
 import traceback
 import resource
 import subprocess as SP
+from distutils.spawn import find_executable
 from glob import glob
 
 from . import CommonDumper, _root_dir
 
+try:
+    from os import set_inheritable # >=3.4
+except ImportError:
+    def set_inheritable(F, inheirt=True):
+        cur = fcntl.fcntl(F, fcntl.F_GETFD)
+        if inheirt:
+            cur &= ~fcntl.FD_CLOEXEC
+        else:
+            cur |= fcntl.FD_CLOEXEC
+        fcntl.fcntl(F, fcntl.F_SETFD, cur)
+
 _log = logging.getLogger(__name__)
 
 core_pattern = '/proc/sys/kernel/core_pattern'
+
+def forknpark(fn, **kws):
+    sys.stdout.flush()
+    sys.stderr.flush()
+
+    pid = os.fork()
+    if pid==0: # child
+        code=0
+        try:
+            fn(**kws)
+        except:
+            traceback.print_exc()
+            code=1
+
+        sys.stdout.flush()
+        sys.stderr.flush()
+
+        os._exit(code)
+        os.abort() # paranoia
+    else: # parent
+        pid, sts = os.waitpid(pid, 0)
+
+        sys.stdout.flush()
+        sys.stderr.flush()
+
+        if sts!=0:
+            raise RuntimeError(sts)
+
+def nsenter(pid):
+    """Join the current process to all of the namespaces
+       of the target PID of which it is not already a member.
+    """
+    myself = ctypes.CDLL(None)
+
+    _setns = myself.setns
+    _setns.argtypes = [ctypes.c_int, ctypes.c_int]
+    _setns.restype = ctypes.c_int
+
+    def setns(F, nstype=0):
+        ret = _setns(F.fileno(), nstype)
+        if ret!=0:
+            raise OSError(ctypes.get_errno())
+
+    NSs = []
+
+    # join all all namespaces of target process.
+    # Some are entered immediately, the rest will only be
+    # entered by child process(es).
+
+    # must open all NS files first (from init mount ns)
+    # before entering any (including mount ns)
+    for ns in os.listdir('/proc/%d/ns'%pid):
+        NSs.append((ns,
+                    open('/proc/%d/ns/%s'%(pid, ns), 'rb'),
+                    open('/proc/self/ns/%s'%ns, 'rb')))
+
+    for ns, T, S in NSs:
+        if not os.path.sameopenfile(T.fileno(), S.fileno()):
+            print('Join', ns, 'namespace')
+            setns(T)
+        T.close()
+        S.close()
 
 class FLock(object):
     def __init__(self, file):
@@ -30,6 +109,8 @@ class FLock(object):
     def __enter__(self):
         fcntl.flock(self._file.fileno(), fcntl.LOCK_EX)
     def __exit__(self,A,B,C):
+        self._file.flush()
+        os.fsync(self._file.fileno())
         fcntl.flock(self._file.fileno(), fcntl.LOCK_UN)
 
 def syncfd(F):
@@ -39,12 +120,34 @@ def syncfd(F):
     with FLock(F):
         pass
 
+class InstallStdIO(object):
+    def __init__(self, out):
+        self.out = out
+
+    def __enter__(self):
+        os.dup2(self.out.fileno(), 1)
+        os.dup2(self.out.fileno(), 2)
+
+        set_inheritable(1, True) # paranoia?
+        set_inheritable(2, True)
+
+        if not sys.stdout:
+            sys.stdout = os.fdopen(1, 'w')
+
+        if not sys.stderr:
+            sys.stderr = os.fdopen(2, 'w')
+
+    def __exit__(self,A,B,C):
+        sys.stdout.flush()
+        sys.stderr.flush()
+        sys.stdout.close()
+        sys.stderr.close()
+        sys.stdout = sys.stderr = None
+
 class LinuxDumper(CommonDumper):
     def install(self):
         self.fix_parent()
         self.sudo()
-
-        gdb = self.findbin(self.args.debugger or 'gdb')
 
         with open(core_pattern, 'r') as F:
             current = F.read()
@@ -62,10 +165,9 @@ class LinuxDumper(CommonDumper):
 import sys
 sys.path.append(r'{cwd}')
 from ci_core_dumper.linux import dump
-dump(outdir=r'{args.outdir}', gdb=r'{gdb}', extra_cmds={cmds!r})
+dump(outdir=r'{args.outdir}', gdb=r'{args.debugger}', extra_cmds={cmds!r})
 '''.format(sys=sys,
            args=self.args,
-           gdb=gdb,
            cwd=_root_dir,
            cmds=self.args.gdb_cmds.split(';'),
            ))
@@ -114,8 +216,6 @@ dump(outdir=r'{args.outdir}', gdb=r'{gdb}', extra_cmds={cmds!r})
             self.error(log)
             self.catfile(log, sync=syncfd)
 
-        self.catfile(os.path.join(self.args.outdir, 'core-dumper.log'))
-
     def doexec(self):
         # raise core file limit for self and child
         S, H = resource.getrlimit(resource.RLIMIT_CORE)
@@ -163,73 +263,106 @@ dump(outdir=r'{args.outdir}', gdb=r'{gdb}', extra_cmds={cmds!r})
             sys.exit(0)
 
 def dump(outdir, gdb, extra_cmds):
+    # running as root in init namespaces (not container)
+    # core file open as stdin
+
     os.umask(0o022)
 
-    pid, hpid, dtime = int(sys.argv[1]), int(sys.argv[2]), int(sys.argv[3])
+    # PID in target namespace, PID in init namespace, time of dump (POSIX)
+    tpid, ipid, dtime = int(sys.argv[1]), int(sys.argv[2]), int(sys.argv[3])
 
-    logging.basicConfig(level=logging.DEBUG, filename=os.path.join(outdir, 'core-dumper.log'))
+    logfile  = os.path.join(outdir, '{}.{}.txt' .format(dtime, ipid))
 
-    _log.debug('Dumping PID %s @ %s', pid, dtime)
+    # Open output file for this analysis, lock output against later syncfd(),
+    # and cause stdout/err to be redirected to it.  (saves us the bother of
+    # redirecting later)
+    with open(logfile, 'w') as LOG, FLock(LOG), InstallStdIO(LOG):
+        print('Dumping PID %d (%d) @ %d %s'%(tpid, ipid, dtime, time.ctime(dtime)))
 
-    corefile = os.path.join(outdir, '{}.{}.core'.format(dtime, hpid))
-    logfile  = os.path.join(outdir, '{}.{}.txt' .format(dtime, hpid))
-
-    with open(logfile, 'w') as LOG, FLock(LOG):
         try:
-            # core file comes through stdin, and is binary
-            if hasattr(sys.stdin, 'buffer'):
-                IF = sys.stdin.buffer # py3
-            else:
-                IF = sys.stdin # py2 (!win32)
+            nsenter(ipid)
 
-            # read info from /proc of dump'd process
-            exe = os.readlink('/proc/{}/exe'.format(hpid))
-            with open('/proc/{}/cmdline'.format(hpid), 'rb') as F:
-                cmdline = [arg.decode('ascii') for arg in F.read().split(b'\0')]
-            cmdline.pop() # result of final nil
-
-            LOG.write('CORE: {}\nEXE: {}\nCMDLINE: {}\n'.format(corefile, exe, cmdline))
-
-            # copy blob content
-            with open(corefile, 'wb') as OF:
-                while True:
-                    blob = IF.read(1024*32)
-                    if not blob:
-                        break
-                    OF.write(blob)
-            # /proc/<hpid> has now disappeared
-
-            if pid!=hpid:
-                LOG.write('Crashing process is %d in a container.'%pid)
-                LOG.write('Analysis not implemented')
-                # would need to access container mount namespace
-
-            else:
-                cmd = [
-                    gdb,
-                    '--nx', '--nw', '--batch', # no .gitinit, no UI, no interactive
-                    '-ex', 'set pagination 0',
-                    '-ex', 'thread apply all bt',
-                ]
-                for extra in extra_cmds:
-                    cmd += ['-ex', extra]
-                cmd += [
-                    exe, corefile
-                ]
-                _log.debug('exec: %s', cmd)
-                LOG.flush()
-
-                with open(os.devnull, 'r') as NULL:
-                    trace = SP.check_output(cmd, stdin=NULL, stderr=SP.STDOUT).decode('utf-8', 'replace')
-
-                LOG.write(trace)
-            LOG.write('\nComplete\n')
-
+            forknpark(dump2, pid=tpid, gdb=gdb, extra_cmds=extra_cmds)
         except:
-            traceback.print_exc(file=LOG)
-        finally:
-            # always flush before unlock
-            LOG.flush()
-            os.fsync(LOG.fileno())
+            traceback.print_exc()
+            sys.exit(1) # not really any point as Linux kernel doesn't seem to do anything with !=0
+        else:
+            print('Complete')
 
-    _log.debug('Complete')
+def dump2(pid, gdb, extra_cmds):
+    # running as root, fully in the target/container namespaces
+
+    # os.environ is still from the init namespaces.
+    # We can't easily inspect target environment(s)
+    # so try to make up something workable.
+    orig_env = os.environ.copy()
+    os.environ.clear()
+    os.environ['TERM'] = 'vt100'
+    os.environ['USER'] = orig_env.get('USER', 'root')
+    os.environ['PATH'] = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+    for sh in (orig_env.get('SHELL','sh'), 'sh', 'bash', 'dash'):
+        shell = find_executable(sh)
+        if sh:
+            os.environ['SHELL'] = shell
+            break
+    else:
+        print('ERROR: no support shell in target')
+        sys.exit(1)
+
+    for gname in (gdb, 'gdb'):
+        gdb = find_executable(gname)
+        if gdb:
+            break
+    else:
+        print('ERROR: Debugger executable not found.  Must install %s'%gdb)
+        sys.exit(1)
+
+    # inspect the target process
+    exe = os.readlink('/proc/{}/exe'.format(pid))
+    with open('/proc/{}/cmdline'.format(pid), 'rb') as F:
+        cmdline = [arg.decode('ascii') for arg in F.read().split(b'\0')]
+    cmdline.pop() # result of final nil
+
+    print('EXE: {}\nCMDLINE: {}'.format(exe, cmdline))
+
+    # write the core file into some temporary storage in the target mount NS
+    for tmpdir in ('/tmp', '/var/tmp', '/dev/shm'):
+        corefile = os.path.join(tmpdir, 'core.ccd.%d'%pid)
+        try:
+            OF = open(corefile, 'wb')
+            break
+        except:
+            print('Unable to write core file to %s'%corefile)
+            continue
+    else:
+        print('Unable to store core file in target FS')
+        sys.exit(1)
+
+    print('Wrote core file to %s'%corefile)
+    with OF:
+        if hasattr(sys.stdin, 'buffer'):
+            IF = sys.stdin.buffer # py3
+        else:
+            IF = sys.stdin # py2 (!win32)
+        shutil.copyfileobj(IF, OF)
+        OF.flush()
+
+    # /proc/<pid> has now disappeared
+
+    cmd = [
+        gdb,
+        '--nx', '--nw', '--batch', # no .gitinit, no UI, no interactive
+        '-ex', 'set pagination 0',
+        '-ex', 'thread apply all bt',
+    ]
+    for extra in extra_cmds:
+        cmd += ['-ex', extra]
+    cmd += [
+        exe, corefile
+    ]
+    print('exec: %s'%cmd)
+    sys.stdout.flush()
+    sys.stderr.flush()
+
+    os.execv(gdb, cmd)
+    # not reached
