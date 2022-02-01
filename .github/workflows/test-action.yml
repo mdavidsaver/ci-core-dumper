@@ -3,14 +3,14 @@ name: Test ci-core-dumper
 on: [push, pull_request]
 
 jobs:
-  test:
+  native:
     runs-on: ${{ matrix.os }}
     name: Crash Test ${{ matrix.os }} / ${{ matrix.python-version }}
     strategy:
       fail-fast: false
       matrix:
         os: ["ubuntu-latest", "windows-latest", "macos-latest"]
-        python-version: [2.7, 3.5, 3.6, 3.7, 3.8]
+        python-version: ['2.7', '3.5', '3.6', '3.7', '3.8', '3.9', '3.10', '3.x']
         exclude:
           # VM image lacks old VS needed
           - os: windows-latest
@@ -39,7 +39,7 @@ jobs:
 
   docker:
     runs-on: ubuntu-latest
-    name: Docker
+    name: Docker ${{ matrix.piparch }} / ${{ matrix.pyver }}
     strategy:
       fail-fast: false
       matrix:
