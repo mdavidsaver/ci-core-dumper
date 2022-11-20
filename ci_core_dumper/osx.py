@@ -1,5 +1,6 @@
 """Show OSX Crash Reporter logs
 """
+# SPDX-License-Identifier: GPL-3.0-or-later
 
 import time
 import os

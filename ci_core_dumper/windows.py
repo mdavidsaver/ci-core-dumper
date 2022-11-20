@@ -3,6 +3,7 @@ Hook into Windows post-mortem debugger facility
 
 https://docs.microsoft.com/en-us/windows-hardware/drivers/debugger/enabling-postmortem-debugging
 """
+# SPDX-License-Identifier: GPL-3.0-or-later
 
 import sys
 import os

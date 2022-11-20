@@ -6,6 +6,7 @@ reaped, the PID is still valid and is used to find the path of the
 executable file.  Along with the core file, this is enough to run
 GDB to produce stack traces.
 """
+# SPDX-License-Identifier: GPL-3.0-or-later
 
 import sys
 import os
