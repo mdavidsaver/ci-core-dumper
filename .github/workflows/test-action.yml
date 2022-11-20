@@ -15,10 +15,15 @@ jobs:
           # VM image lacks old VS needed
           - os: windows-latest
             python-version: 2.7
+          - os: windows-latest
+            python-version: 3.5
+        include:
+          - os: windows-2019
+            python-version: 3.5
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v2
+        uses: actions/setup-python@v4
         with:
           python-version: ${{ matrix.python-version }}
       - name: Builder Info
@@ -46,8 +51,11 @@ jobs:
         include:
           - pyver: cp27-cp27m
             piparch: manylinux1_x86_64
+
+          - pyver: cp310-cp310
+            piparch: manylinux2014_x86_64
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - uses: ./
       - name: Docker
         run: |
@@ -58,6 +66,7 @@ jobs:
           cd /io
           export PATH="/opt/python/${{ matrix.pyver }}/bin:\$PATH"
           which python
+          yum -y install gdb
 
           python build_crasher.py
           python -m ci_core_dumper exec python test_crasher.py
