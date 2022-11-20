@@ -19,14 +19,14 @@ jobs:
     runs-on: ${{ matrix.os }}
     name: My Job
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - uses: mdavidsaver/ci-core-dumper@master
       - runs: |
          ulimit -c unlimited
          ... something which might crash
 ```
 
-With Github Actions only, a dummy 'ulimit' command is provided on Windows.
+With Github Actions only, a dummy `ulimit` command is provided on Windows.
 
 Usage in Travis-CI:
 
@@ -95,5 +95,3 @@ Development
 Please report any issue on the Github project.
 
 * [Github Project](https://github.com/mdavidsaver/ci-core-dumper)
-* [Travis-CI status](https://travis-ci.org/github/mdavidsaver/ci-core-dumper)
-* [Appveyor status](https://ci.appveyor.com/project/mdavidsaver/ci-core-dumper)
