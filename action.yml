@@ -10,6 +10,6 @@ inputs:
     required: false
     default: ''
 runs:
-  using: 'node12'
+  using: 'node16'
   main: 'prepare.js'
   post: 'analyze.js'
