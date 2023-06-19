@@ -10,11 +10,14 @@ jobs:
       fail-fast: false
       matrix:
         os: ["ubuntu-latest", "windows-latest", "macos-latest"]
-        python-version: ['2.7', '3.5', '3.6', '3.7', '3.8', '3.9', '3.10', '3.x']
+        python-version: ['3.5', '3.6', '3.7', '3.8', '3.9', '3.10', '3.x']
         exclude:
+          # actions/setup-python no longer provides...
+          - os: ubuntu-latest
+            python-version: 3.5
+          - os: ubuntu-latest
+            python-version: 3.6
           # VM image lacks old VS needed
-          - os: windows-latest
-            python-version: 2.7
           - os: windows-latest
             python-version: 3.5
         include:
