@@ -21,8 +21,11 @@ import shutil
 import traceback
 import resource
 import subprocess as SP
-from distutils.spawn import find_executable
 from glob import glob
+try:
+    from distutils.spawn import find_executable # < 3.12
+except ImportError:
+    from shutil import which as find_executable # >= 3.3
 
 from . import CommonDumper, _root_dir
 

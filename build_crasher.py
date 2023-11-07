@@ -2,6 +2,7 @@
 
 from __future__ import print_function
 
+import setuptools # allow to monkey path in setuptools._distutils
 from distutils.ccompiler import new_compiler
 import os
 import platform
