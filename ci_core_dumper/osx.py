@@ -32,6 +32,7 @@ class DarwinDumper(CommonDumper):
         time.sleep(10)
 
         for path in ('~/Library/Logs/DiagnosticReports/*.diag', '~/Library/Logs/DiagnosticReports/*.dpsub', '~/Library/Logs/CrashReporter/*.{0}'.format(self.crash_ext)):
-            for report in glob(os.path.expanduser(path)):
-                self.error(report)
-                self.catfile(report)
+            if os.path.exists(path):
+                for report in glob(os.path.expanduser(path)):
+                    self.error(report)
+                    self.catfile(report)
