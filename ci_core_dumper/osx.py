@@ -19,7 +19,8 @@ class DarwinDumper(CommonDumper):
         # so we just wait a while and hope for the best
         time.sleep(10)
 
-        for path in ('~/Library/Logs/DiagnosticReports/*.crash', '~/Library/Logs/CrashReporter/*.crash'):
-            for report in glob(os.path.expanduser(path)):
-                self.error(report)
-                self.catfile(report)
+        for dir in ('~/Library/Logs/DiagnosticReports/', '~/Library/Logs/CrashReporter/'):
+            for pat in ('*.crash', '*.ips'): # OSX >= 12.0 changes dump format, and file extension
+                for report in glob(os.path.expanduser(dir+pat)):
+                    self.error(report)
+                    self.catfile(report)
