@@ -61,6 +61,9 @@ jobs:
           which python
           yum -y install gdb
 
+          python -m pip install -U pip
+          python -m pip install setuptools
+
           python build_crasher.py
           python -m ci_core_dumper exec python test_crasher.py
 
