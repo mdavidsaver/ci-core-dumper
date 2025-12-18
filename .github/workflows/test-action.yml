@@ -1,6 +1,6 @@
 name: Test ci-core-dumper
 
-on: [push, pull_request]
+on: [push, pull_request, workflow_dispatch]
 
 jobs:
   native:
@@ -10,21 +10,25 @@ jobs:
       fail-fast: false
       matrix:
         os: ["ubuntu-latest", "windows-latest", "macos-latest"]
-        python-version: ['3.8', '3.9', '3.10', '3.11', '3.12', '3.x']
+        python-version: ['3.8', '3.9', '3.10', '3.11', '3.12', '3.13', '3.14', '3.x']
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v6
+
       - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python-version }}
+
       - name: Builder Info
         shell: bash
         run: |
           which python
           python --version
+
       - uses: ./
         with:
           extra_gdb: "info auto-load"
+
       - name: Test
         shell: bash
         run: |
@@ -48,7 +52,9 @@ jobs:
             piparch: manylinux2014_x86_64
     steps:
       - uses: actions/checkout@v3
+
       - uses: ./
+
       - name: Docker
         run: |
           # can't use GHA native docker support since GHA magic binaries need .so absent from old manylinux images :(
