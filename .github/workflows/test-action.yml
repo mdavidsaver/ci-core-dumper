@@ -48,6 +48,12 @@ jobs:
           - pyver: cp27-cp27m
             piparch: manylinux1_x86_64
 
+          - pyver: cp37-cp37m
+            piparch: manylinux2010_x86_64
+
+          - pyver: cp38-cp38
+            piparch: manylinux2014_x86_64
+
           - pyver: cp310-cp310
             piparch: manylinux2014_x86_64
     steps:
@@ -78,3 +84,52 @@ jobs:
           chmod +x runit.sh
           docker pull quay.io/pypa/${{ matrix.piparch }}
           docker run --privileged --rm -v `pwd`:/io quay.io/pypa/${{ matrix.piparch }} ${{ matrix.pre }} /io/runit.sh
+
+
+  podman:
+    runs-on: ubuntu-latest
+    name: podman ${{ matrix.piparch }} / ${{ matrix.pyver }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - pyver: cp27-cp27m
+            piparch: manylinux1_x86_64
+
+          - pyver: cp37-cp37m
+            piparch: manylinux2010_x86_64
+
+          - pyver: cp38-cp38
+            piparch: manylinux2014_x86_64
+
+          - pyver: cp310-cp310
+            piparch: manylinux2014_x86_64
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: ./
+
+      - name: Docker
+        run: |
+          # can't use GHA native docker support since GHA magic binaries need .so absent from old manylinux images :(
+          cat <<EOF > runit.sh
+          #!/bin/sh
+          set -e -x
+          ls -d /opt/python
+          cd /io
+          export PATH="/opt/python/${{ matrix.pyver }}/bin:\$PATH"
+          which python
+          yum -y install gdb
+
+          python -m pip install -U pip
+          python -m pip install setuptools
+
+          python build_crasher.py
+          python -m ci_core_dumper exec python test_crasher.py
+
+          EOF
+          cat runit.sh
+          chmod +x runit.sh
+          podman run --rm \
+            -v `pwd`:/io quay.io/pypa/${{ matrix.piparch }} \
+            /io/runit.sh
