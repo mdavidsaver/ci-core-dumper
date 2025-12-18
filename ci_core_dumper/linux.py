@@ -71,7 +71,7 @@ def forknpark(fn, **kws):
         if sts!=0:
             raise RuntimeError(sts)
 
-def nsenter(pid):
+def nsenter(pid, spaces):
     """Join the current process to all of the namespaces
        of the target PID of which it is not already a member.
     """
@@ -94,7 +94,7 @@ def nsenter(pid):
 
     # must open all NS files first (from init mount ns)
     # before entering any (including mount ns)
-    for ns in os.listdir('/proc/%d/ns'%pid):
+    for ns in spaces:
         NSs.append((ns,
                     open('/proc/%d/ns/%s'%(pid, ns), 'rb'),
                     open('/proc/self/ns/%s'%ns, 'rb')))
@@ -105,6 +105,23 @@ def nsenter(pid):
             setns(T)
         T.close()
         S.close()
+
+def read_uid_gid(pid):
+    'Detect UID/GID of target PID'
+    res = os.stat('/proc/{}/status'.format(pid))
+    return res.st_uid, res.st_gid
+
+def readenv(pid):
+    'Read environment of running process'
+    env = {}
+    with open('/proc/{}/environ'.format(pid), 'r') as F:
+        # b"VAR=value\0...\0"
+        lines = F.read().split('\0')
+        lines.pop() # trailing nil
+        for ev in lines:
+            K, V = ev.split('=', 1)
+            env[K] = V
+    return env
 
 class FLock(object):
     def __init__(self, file):
@@ -283,8 +300,11 @@ def dump(outdir, gdb, extra_cmds):
         print('Dumping PID %d (%d) @ %d %s'%(tpid, ipid, dtime, time.ctime(dtime)))
 
         try:
-            nsenter(ipid)
+            # only need to join mount namespace.
+            # also join PID namespace so that target PID can be used.
+            nsenter(ipid, ('mnt', 'pid'))
 
+            # must fork in order to fully join
             forknpark(dump2, pid=tpid, gdb=gdb, extra_cmds=extra_cmds)
         except:
             traceback.print_exc()
@@ -295,29 +315,22 @@ def dump(outdir, gdb, extra_cmds):
 def dump2(pid, gdb, extra_cmds):
     # running as root, fully in the target/container namespaces
 
-    # os.environ is still from the init namespaces.
-    # We can't easily inspect target environment(s)
-    # so try to make up something workable.
-    orig_env = os.environ.copy()
-    os.environ.clear()
-    os.environ['TERM'] = 'vt100'
-    os.environ['USER'] = orig_env.get('USER', 'root')
-    os.environ['PATH'] = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
-    for sh in (orig_env.get('SHELL','sh'), 'sh', 'bash', 'dash'):
-        shell = find_executable(sh)
-        if sh:
-            os.environ['SHELL'] = shell
-            break
-    else:
-        print('ERROR: no support shell in target')
-        sys.exit(1)
+    # assume target process identity
+    # must have mappable uid/gid when/if overlayfs is in used, or it will EOVERFLOW all over us.
+    uid, gid = read_uid_gid(pid)
+    os.setgid(gid)
+    os.setuid(uid)
+
+    print('Target UID %s/%s'%(uid, gid))
+
+    env = readenv(pid)
 
     for gname in (gdb, 'gdb'):
-        gdb = find_executable(gname)
+        gdb = find_executable(gname, path=env.get('PATH') or '')
         if gdb:
             break
     else:
-        print('ERROR: Debugger executable not found.  Must install %s'%gdb)
+        print('ERROR: Debugger %s executable not found in target NS: %s'%(gdb, env.get('PATH')))
         sys.exit(1)
 
     # inspect the target process
@@ -331,17 +344,23 @@ def dump2(pid, gdb, extra_cmds):
     # write the core file into some temporary storage in the target mount NS
     for tmpdir in ('/tmp', '/var/tmp', '/dev/shm'):
         corefile = os.path.join(tmpdir, 'core.ccd.%d'%pid)
+        assert not os.path.exists(corefile), corefile
         try:
             OF = open(corefile, 'wb')
             break
-        except:
-            print('Unable to write core file to %s'%corefile)
+        except Exception as e:
+            print('Unable to write core file to %s : %r'%(corefile, e))
             continue
     else:
         print('Unable to store core file in target FS')
+        for path in ('/proc/{}/mountinfo', '/proc/{}/status', '/proc/{}/uid_map', '/proc/{}/gid_map'):
+            with open(path.format(pid), 'r') as F:
+                print('#', F.name)
+                for L in F.readlines():
+                    print('  ', L.rstrip())
         sys.exit(1)
 
-    print('Wrote core file to %s'%corefile)
+    print('Writing core file to %s'%corefile)
     with OF:
         if hasattr(sys.stdin, 'buffer'):
             IF = sys.stdin.buffer # py3
@@ -367,5 +386,5 @@ def dump2(pid, gdb, extra_cmds):
     sys.stdout.flush()
     sys.stderr.flush()
 
-    os.execv(gdb, cmd)
+    os.execve(gdb, cmd, env)
     # not reached
