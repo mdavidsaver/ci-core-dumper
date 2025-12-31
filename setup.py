@@ -4,12 +4,12 @@ from setuptools import setup
 
 setup(
     name='ci-core-dumper',
-    version='0.0.0',
+    version='1.0.0',
     description="Automatic capture and analysis of core dumps during CI runs",
     license='GPL-3',
     author='Michael Davidsaver',
     author_email='mdavidsaver@gmail.com',
-    python_requires='>=2.7',
+    python_requires='>=3.8',
     packages=['ci_core_dumper'],
     install_requires = [],
     entry_points = {
