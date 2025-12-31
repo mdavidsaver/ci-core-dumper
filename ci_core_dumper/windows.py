@@ -12,10 +12,13 @@ import logging
 import errno
 import traceback
 import ctypes
+import shutil
+import winreg
 import subprocess as SP
 from glob import glob
 
 from . import CommonDumper, _root_dir
+from .installcdb import main as install_cdb
 
 AeDebug = r'Software\Microsoft\Windows NT\CurrentVersion\AeDebug'
 AeDebug6432 = r'Software\Wow6432Node\Microsoft\Windows NT\CurrentVersion\AeDebug'
@@ -23,44 +26,44 @@ AeDebug6432 = r'Software\Wow6432Node\Microsoft\Windows NT\CurrentVersion\AeDebug
 _log = logging.getLogger(__name__)
 
 def syncfd(F):
+    # poor man's lockfile
     lck = F.name+'.lck'
     while os.path.isfile(lck):
         time.sleep(1.0)
 
 def reg_replace(bits, kname, vname, value):
-    try:
-        import winreg
-    except ImportError:
-        import _winreg as winreg
-
     access = winreg.KEY_READ|winreg.KEY_WRITE
     access |= {
         32:winreg.KEY_WOW64_32KEY,
         64:winreg.KEY_WOW64_64KEY,
     }[bits]
 
-    key = winreg.OpenKeyEx(winreg.HKEY_LOCAL_MACHINE, kname, 0, access)
+    with winreg.OpenKeyEx(winreg.HKEY_LOCAL_MACHINE, kname, 0, access) as key:
+        try:
+            prev, type = winreg.QueryValueEx(key, vname)
+            assert type==winreg.REG_SZ, type
+        except WindowsError as e:
+            if e.errno!=errno.ENOENT:
+                raise
+            prev = None
 
-    try:
-        prev, type = winreg.QueryValueEx(key, vname)
-        assert type==winreg.REG_SZ, type
-    except WindowsError as e:
-        if e.errno!=errno.ENOENT:
-            raise
-        prev = None
-
-    winreg.SetValueEx(key, vname, 0, winreg.REG_SZ, value)
-    winreg.FlushKey(key)
+        winreg.SetValueEx(key, vname, 0, winreg.REG_SZ, value)
+        winreg.FlushKey(key)
     _log.debug('%s SetValue %s.%s = %s', bits, kname, vname, value)
 
     return prev
 
-def cdbsearch():
-    arch = os.environ.get('PLATFORM', 'x64').lower()
-    ret = []
-    for cdb in glob(r'C:\Program Files (x86)\Windows Kits\*\Debuggers\{}\cdb.exe'.format(arch)):
-        ret.append(os.path.dirname(cdb))
-    return ret
+def find_cdb(exe='cdb.exe') -> str:
+    arch = os.environ.get('PLATFORM', 'x64').lower() # arm64, x64, x86
+    for cdb in glob(f'C:/Program Files (x86)/Windows Kits/*/Debuggers/{arch}/{exe}'):
+        if os.path.isfile(cdb):
+            _log.info('Found: %r', cdb)
+            return cdb
+        _log.warning('Not file: %r', cdb)
+    cdb = shutil.which(exe)
+    if cdb is not None:
+        return cdb
+    raise RuntimeError(f'Can not find {find_cdb}')
 
 def binsearch():
     '''Find all directories containing .exe .dll and .lib
@@ -75,9 +78,13 @@ def binsearch():
 class WindowsDumper(CommonDumper):
     def install(self):
         self.ErrorMode()
-        os.environ['PATH'] = os.pathsep.join([os.environ['PATH']] + cdbsearch())
 
-        cdb = self.findbin(self.args.debugger or 'cdb.exe')
+        try:
+            cdb = find_cdb(self.args.debugger or 'cdb.exe')
+        except RuntimeError:
+            install_cdb()
+            # try again
+            cdb = find_cdb(self.args.debugger or 'cdb.exe')
 
         sympath = binsearch()
         [_log.debug('Sympath %s', spath) for spath in sympath]
