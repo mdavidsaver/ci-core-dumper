@@ -31,12 +31,8 @@ def syncfd(F):
     while os.path.isfile(lck):
         time.sleep(1.0)
 
-def reg_replace(bits, kname, vname, value):
-    access = winreg.KEY_READ|winreg.KEY_WRITE
-    access |= {
-        32:winreg.KEY_WOW64_32KEY,
-        64:winreg.KEY_WOW64_64KEY,
-    }[bits]
+def reg_replace(kname, vname, value):
+    access = winreg.KEY_READ|winreg.KEY_WRITE|winreg.KEY_WOW64_64KEY
 
     with winreg.OpenKeyEx(winreg.HKEY_LOCAL_MACHINE, kname, 0, access) as key:
         try:
@@ -49,7 +45,7 @@ def reg_replace(bits, kname, vname, value):
 
         winreg.SetValueEx(key, vname, 0, winreg.REG_SZ, value)
         winreg.FlushKey(key)
-    _log.debug('%s SetValue %s.%s = %s', bits, kname, vname, value)
+    _log.debug('SetValue %s.%s = %s', kname, vname, value)
 
     return prev
 
@@ -111,13 +107,10 @@ dump(*sys.argv[1:4],
            args=self.args,
            sympath='*'.join(sympath)))
 
-        reg_replace(32, AeDebug, 'Debugger', '"{}" "{}" 32 %ld %ld'.format(sys.executable, dumper))
-        reg_replace(32, AeDebug, 'Auto', '1')
-        # on 64
-        reg_replace(64, AeDebug, 'Debugger', '"{}" "{}" 64 %ld %ld'.format(sys.executable, dumper))
-        reg_replace(64, AeDebug, 'Auto', '1')
-        reg_replace(64, AeDebug6432, 'Debugger', '"{}" 6432 "{}" %ld %ld'.format(sys.executable, dumper))
-        reg_replace(64, AeDebug6432, 'Auto', '1')
+        reg_replace(AeDebug, 'Debugger', f'"{sys.executable}" "{dumper}" 64 %ld %ld')
+        reg_replace(AeDebug, 'Auto', '1')
+        reg_replace(AeDebug6432, 'Debugger', f'"{sys.executable}" 6432 "{dumper}" %ld %ld')
+        reg_replace(AeDebug6432, 'Auto', '1')
 
     def uninstall(self):
         _log.warning('uninstall not implemented')
@@ -164,8 +157,8 @@ def dump(arch, pid, event, outdir=None, cdb=None, cdb_extra=None):
             try:
 
                 with open(cdbfile, 'w') as F:
-                    F.write('''
-.symfix+ c:\symcache
+                    F.write(f'''
+.symfix+ c:\\symcache
 .sympath
 .echo Modules list
 lm
@@ -177,7 +170,7 @@ lm
 .echo End
 .kill
 q
-'''.format(cdb_extra=cdb_extra))
+''')
 
                 cmd = [
                     cdb,
@@ -211,7 +204,7 @@ q
 
                 code = proc.poll()
                 if code:
-                    LOG.write('ERROR: {}\n'.format(code))
+                    LOG.write(f'ERROR: {code}\n')
 
                 LOG.write(trace.decode('ascii'))
                 LOG.write('\nComplete\n')
