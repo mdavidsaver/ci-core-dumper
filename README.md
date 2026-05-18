@@ -19,7 +19,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     name: My Job
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v6
       - uses: mdavidsaver/ci-core-dumper@master
       - runs: |
          ulimit -c unlimited
